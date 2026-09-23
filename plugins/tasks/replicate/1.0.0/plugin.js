@@ -2,7 +2,7 @@
 const FLUX_MODEL = "black-forest-labs/flux-1.1-pro";
 const GPT_MODEL = "openai/gpt-image-2";
 const MODELS = [FLUX_MODEL, GPT_MODEL];
-const MAX_IMAGE_COUNT = 128;
+const MAX_IMAGE_COUNT = 10;
 const MAX_INLINE_IMAGE_BYTES = 1048576;
 
 export const meta = {
@@ -54,24 +54,16 @@ function count(value, field, maxCount) {
 
 function countFromInput(req, input, nativeInput, model) {
   const maxCount = model === FLUX_MODEL ? 1 : 10;
-  const declared = [];
-  if (req.n !== undefined && req.n !== null) declared.push(["n", count(req.n, "n", maxCount)]);
-  for (const key of ["number_of_images", "num_outputs"]) {
-    if (input[key] === undefined || input[key] === null) continue;
-    if (model === FLUX_MODEL) throw new Error("Flux 1.1 Pro does not support " + key);
-    if (model === GPT_MODEL && key === "num_outputs") throw new Error("GPT Image 2 does not support num_outputs");
-    declared.push(["input." + key, count(input[key], "input." + key, maxCount)]);
-  }
-  if (declared.length) {
-    const expected = declared[0][1];
-    for (const [field, value] of declared) {
-      if (value !== expected) throw new Error(field + " must match " + declared[0][0]);
-    }
-    if (nativeInput && expected > 1 && input.number_of_images === undefined && input.num_outputs === undefined)
-      throw new Error("n greater than 1 requires input.number_of_images or input.num_outputs");
-    return expected;
-  }
-  return 1;
+  const outer = req.n == null ? null : count(req.n, "n", maxCount);
+  const hasProviderCount = Object.prototype.hasOwnProperty.call(input, "number_of_images");
+  const hasNumOutputs = Object.prototype.hasOwnProperty.call(input, "num_outputs");
+  if (model === FLUX_MODEL && (hasProviderCount || hasNumOutputs))
+    throw new Error("Flux 1.1 Pro does not support image count fields");
+  if (hasNumOutputs) throw new Error("GPT Image 2 does not support num_outputs");
+  const provider = hasProviderCount ? count(input.number_of_images, "input.number_of_images", maxCount) : null;
+  if (outer !== null && provider !== null && outer !== provider) throw new Error("n must match input.number_of_images");
+  if (nativeInput && outer > 1 && provider === null) throw new Error("n greater than 1 requires input.number_of_images");
+  return provider ?? outer ?? 1;
 }
 
 function fluxSize(input, size) {
@@ -103,7 +95,7 @@ function fluxSize(input, size) {
 function imageUploads(files) {
   const images = [];
   for (const file of files || []) {
-    if (!/^image(?:\[\d*\])?$/.test(file.field)) continue;
+    if (!/^image(?:\[\d*\])?$/.test(file.field) && file.field !== "image_prompt") continue;
     if (file.size > MAX_INLINE_IMAGE_BYTES)
       throw new Error("uploaded image exceeds 1 MiB; provide a hosted image URL in input instead");
     images.push({ __fileRef: file.ref, encoding: "dataUrl", maxBytes: MAX_INLINE_IMAGE_BYTES });
@@ -220,22 +212,20 @@ function imageURLs(body) {
   return urls;
 }
 
-function predictionBody(task) {
-  const data = isObject(task.data) ? { ...task.data } : {};
-  const statuses = { NOT_START: "starting", SUBMITTED: "starting", QUEUED: "starting", IN_PROGRESS: "processing", SUCCESS: "succeeded", FAILURE: "failed" };
-  data.id = task.task_id;
-  data.status = statuses[task.status] || "processing";
-  if (task.status === "FAILURE") data.error = task.fail_reason || data.error || "Replicate prediction failed";
-  return data;
-}
-
 export const native = {
   createPrediction(ctx) {
     if (!ctx.body || ctx.body.kind !== "json" || !isObject(ctx.body.value)) throw new Error("JSON object required");
     if (!MODELS.includes(text(ctx.body.value.model))) throw new Error("unsupported Replicate model");
     return normalizeRequest({ body: ctx.body, model: ctx.body.value.model, operation: "generate" });
   },
-  prediction(ctx, task) { return predictionBody(task); },
+  prediction(ctx, task) {
+    const data = isObject(task.data) ? task.data : {};
+    const statuses = { NOT_START: "starting", SUBMITTED: "starting", QUEUED: "starting", IN_PROGRESS: "processing", SUCCESS: "succeeded", FAILURE: "failed" };
+    const response = { id: task.task_id, status: statuses[task.status] || "unknown" };
+    if (task.status === "SUCCESS") response.output = data.output;
+    if (task.status === "FAILURE") response.error = task.fail_reason || failureReason(data);
+    return response;
+  },
 };
 
 export const protocols = {
@@ -268,8 +258,9 @@ export function parseSubmitResponse(ctx, response) {
   const result = { taskId: body.id, taskData: body };
   const current = status(body);
   if (current === "SUCCESS") {
-    if (!imageURLs(body).length) result.immediate = { status: "FAILURE", reason: "Replicate prediction succeeded without an image" };
-    else result.immediate = { status: "SUCCESS", url: imageURLs(body)[0] };
+    const urls = imageURLs(body);
+    if (!urls.length) result.immediate = { status: "FAILURE", reason: "Replicate prediction succeeded without an image" };
+    else result.immediate = { status: "SUCCESS", url: urls[0] };
   } else if (current === "FAILURE") result.immediate = { status: "FAILURE", reason: failureReason(body) };
   else if (current === "UNKNOWN") throw new Error("unrecognized Replicate prediction status: " + String(body.status));
   return result;
