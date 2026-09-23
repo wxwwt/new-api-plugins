@@ -164,6 +164,9 @@ function normalizeRequest(ctx) {
       if (!excluded.has(key)) input[key] = value;
     }
   }
+  // Replicate echoes input in prediction responses, which the host persists
+  // for polling and result rendering. Do not persist a caller's BYOK secret.
+  if (input.openai_api_key !== undefined) throw new Error("input.openai_api_key is not supported by this plugin");
 
   const uploads = ctx.body.kind === "multipart" ? imageUploads(ctx.body.files) : [];
   if (uploads.length) {

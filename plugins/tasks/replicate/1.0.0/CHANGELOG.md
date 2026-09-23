@@ -20,3 +20,4 @@ locale: "en"
 - Install and activate this plugin on both gateways when routing Replicate images through another New API instance.
 - Set `TASK_PLUGIN_PROTOCOL_TIMEOUT_SECONDS` to 1200 if image requests must wait up to 20 minutes for a completed response; the default is 600 seconds.
 - Provide hosted image URLs for edit files larger than 1 MiB; smaller multipart uploads are sent as data URLs.
+- Remove `input.openai_api_key` from requests; the plugin rejects it because Replicate may echo it in persisted prediction data.

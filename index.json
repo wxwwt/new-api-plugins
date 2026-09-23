@@ -2489,7 +2489,7 @@
         {
           "version": "1.0.0",
           "path": "plugins/tasks/replicate/1.0.0/plugin.js",
-          "sha256": "3b383644d06a5fc29cb68da30332c82c4792bacfc87253b1dd6a030e28ca3b14",
+          "sha256": "532ac2c7cb18021a0cecadffeb9c2ca36f8cbb9112789229b281a65fe32266fe",
           "minApiVersion": 1,
           "kind": "task",
           "baseUrl": "https://api.replicate.com",
