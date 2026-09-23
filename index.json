@@ -2426,6 +2426,78 @@
       ]
     },
     {
+      "key": "replicate",
+      "name": "Replicate",
+      "icon": "text:R",
+      "description": {
+        "en": "Replicate image generation and editing with native model inputs",
+        "zh": "通过 Replicate 原生模型参数生成和编辑图片"
+      },
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/replicate/v1/predictions",
+          "type": "submit",
+          "decode": "createPrediction",
+          "render": "prediction"
+        },
+        {
+          "method": "GET",
+          "path": "/replicate/v1/predictions/:task_id",
+          "type": "query",
+          "render": "prediction",
+          "taskIdParam": "task_id"
+        }
+      ],
+      "protocols": [
+        {
+          "name": "openai_image"
+        }
+      ],
+      "usageSchema": {
+        "image_count": {
+          "type": "number",
+          "unit": "count",
+          "unitLabel": {
+            "en": "image",
+            "zh": "张"
+          },
+          "description": {
+            "en": "Image generation unit price",
+            "zh": "图片生成单价"
+          }
+        }
+      },
+      "usageExamples": [
+        {
+          "label": "1 image",
+          "facts": {
+            "image_count": 1
+          }
+        }
+      ],
+      "usageProfiles": null,
+      "channelTypes": [
+        56
+      ],
+      "models": [
+        "black-forest-labs/flux-1.1-pro",
+        "openai/gpt-image-2"
+      ],
+      "latest": "1.0.0",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "path": "plugins/tasks/replicate/1.0.0/plugin.js",
+          "sha256": "3b383644d06a5fc29cb68da30332c82c4792bacfc87253b1dd6a030e28ca3b14",
+          "minApiVersion": 1,
+          "kind": "task",
+          "baseUrl": "https://api.replicate.com",
+          "auth": "api_key"
+        }
+      ]
+    },
+    {
       "key": "sora",
       "name": "Sora",
       "icon": "Sora.Color",
